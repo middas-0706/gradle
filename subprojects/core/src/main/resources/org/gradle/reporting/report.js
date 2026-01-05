@@ -22,7 +22,10 @@
     }
 
     function removeClass(element, classValue) {
-        changeElementClass(element, getClassAttribute(element).replace(classValue, ""));
+        const currentClass = getClassAttribute(element);
+        if (currentClass) {
+            changeElementClass(element, currentClass.replace(classValue, ""));
+        }
     }
 
     function getCheckBox() {
