@@ -417,6 +417,51 @@ class TestReportAggregationPluginIntegrationTest extends AbstractIntegrationSpec
         }
     }
 
+    def 'failure filter checkbox is present when there are failures'() {
+        given:
+        buildFile << '''
+            apply plugin: 'org.gradle.test-report-aggregation'
+
+            dependencies {
+                testReportAggregation project(":application")
+                testReportAggregation project(":direct")
+                testReportAggregation project(":transitive")
+            }
+
+            reporting {
+                reports {
+                    testAggregateTestReport(AggregateTestReport) {
+                        testSuiteName = "test"
+                    }
+                }
+            }
+        '''
+
+        when:
+        fails(':testAggregateTestReport', "--continue")
+
+        then:
+        def aggregatedTestResults = new HtmlTestExecutionResult(testDirectory, 'build/reports/tests/test/aggregated-results')
+        
+        // Verify that the failure filter checkbox is present in the HTML
+        aggregatedTestResults.assertHtml("#failure-filter-toggle") { e ->
+            verifyAll {
+                e.size() == 1
+                e[0].tagName() == "input"
+                e[0].attr("type") == "checkbox"
+            }
+        }
+        
+        // Verify that the label for the checkbox is present
+        aggregatedTestResults.assertHtml("#label-for-failure-filter-toggle") { e ->
+            verifyAll {
+                e.size() == 1
+                e[0].tagName() == "label"
+                e[0].text().contains("Show failures only")
+            }
+        }
+    }
+
     def 'can aggregate tests from root project when subproject does not have tests'() {
         given:
         buildFile << '''
