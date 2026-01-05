@@ -173,7 +173,7 @@
             for (let j = 0; j < rows.length; j++) {
                 const row = rows[j];
                 // Skip header rows
-                if (row.parentNode.tagName === "THEAD") {
+                if (row.parentNode.tagName.toUpperCase() === "THEAD") {
                     continue;
                 }
 
