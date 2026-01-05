@@ -144,7 +144,7 @@
         for (let i = 0; i < tables.length; i++) {
             const table = tables[i];
             const tableClass = getClassAttribute(table);
-            if (!tableClass || !tableClass.includes("test-results")) {
+            if (!tableClass || tableClass.indexOf("test-results") < 0) {
                 continue;
             }
 
@@ -180,37 +180,37 @@
             checkBox.checked = false;
 
             removeClass(label, "hidden");
-         }
+        }
 
-         // Initialize failure filter if it exists
-         const failureFilterCheckBox = getFailureFilterCheckBox();
-         if (failureFilterCheckBox) {
-             const failureFilterLabel = getLabelForFailureFilterCheckBox();
-             
-             // Check if there are any failure tabs
-             const tabContainers = getTabContainers();
-             let hasFailures = false;
-             for (let i = 0; i < tabContainers.length; i++) {
-                 const container = tabContainers[i];
-                 const headers = findHeaders(container);
-                 for (let j = 0; j < headers.length; j++) {
-                     const link = headers[j].querySelector("a");
-                     if (link && hasFailureClass(link)) {
-                         hasFailures = true;
-                         break;
-                     }
-                 }
-                 if (hasFailures) break;
-             }
-             
-             if (hasFailures) {
-                 failureFilterCheckBox.onclick = toggleFailureFilter;
-                 failureFilterCheckBox.checked = false;
-                 removeClass(failureFilterLabel, "hidden");
-             }
-         }
+        // Initialize failure filter if it exists
+        const failureFilterCheckBox = getFailureFilterCheckBox();
+        if (failureFilterCheckBox) {
+            const failureFilterLabel = getLabelForFailureFilterCheckBox();
+            
+            // Check if there are any failure tabs
+            const tabContainers = getTabContainers();
+            let hasFailures = false;
+            for (let i = 0; i < tabContainers.length; i++) {
+                const container = tabContainers[i];
+                const headers = findHeaders(container);
+                for (let j = 0; j < headers.length; j++) {
+                    const link = headers[j].querySelector("a");
+                    if (link && hasFailureClass(link)) {
+                        hasFailures = true;
+                        break;
+                    }
+                }
+                if (hasFailures) break;
+            }
+            
+            if (hasFailures) {
+                failureFilterCheckBox.onclick = toggleFailureFilter;
+                failureFilterCheckBox.checked = false;
+                removeClass(failureFilterLabel, "hidden");
+            }
+        }
 
-         initClipboardCopyButton()
+        initClipboardCopyButton()
     }
 
     class TabManager {
