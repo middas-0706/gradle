@@ -97,13 +97,34 @@
     }
 
     function hasFailureClass(element) {
+        if (!element) {
+            return false;
+        }
         const className = getClassAttribute(element);
         return className && className.indexOf("failureGroup") >= 0;
     }
 
     function hasFailuresClass(element) {
+        if (!element) {
+            return false;
+        }
         const className = getClassAttribute(element);
         return className && className.indexOf("failures") >= 0;
+    }
+
+    function hasAnyFailureTabs() {
+        const tabContainers = getTabContainers();
+        for (let i = 0; i < tabContainers.length; i++) {
+            const container = tabContainers[i];
+            const headers = findHeaders(container);
+            for (let j = 0; j < headers.length; j++) {
+                const link = headers[j].querySelector("a");
+                if (hasFailureClass(link)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     function toggleFailureFilter() {
@@ -122,7 +143,7 @@
 
                 if (checkBox.checked) {
                     // Filter mode: hide non-failure tabs
-                    if (link && hasFailureClass(link)) {
+                    if (hasFailureClass(link)) {
                         removeClass(header, "filtered-out");
                         // Also filter content within the tab
                         filterTabContent(tab, true);
@@ -157,9 +178,16 @@
                 }
 
                 if (showFailuresOnly) {
-                    // Check if this row has a failure class
-                    const firstCell = row.querySelector("td");
-                    if (firstCell && hasFailuresClass(firstCell)) {
+                    // Check if any cell in this row has a failure class
+                    const cells = row.getElementsByTagName("td");
+                    let hasFailure = false;
+                    for (let k = 0; k < cells.length; k++) {
+                        if (hasFailuresClass(cells[k])) {
+                            hasFailure = true;
+                            break;
+                        }
+                    }
+                    if (hasFailure) {
                         removeClass(row, "filtered-out");
                     } else {
                         addClass(row, "filtered-out");
@@ -182,32 +210,13 @@
             removeClass(label, "hidden");
         }
 
-        // Initialize failure filter if it exists
+        // Initialize failure filter if it exists and there are failures
         const failureFilterCheckBox = getFailureFilterCheckBox();
-        if (failureFilterCheckBox) {
+        if (failureFilterCheckBox && hasAnyFailureTabs()) {
             const failureFilterLabel = getLabelForFailureFilterCheckBox();
-            
-            // Check if there are any failure tabs
-            const tabContainers = getTabContainers();
-            let hasFailures = false;
-            for (let i = 0; i < tabContainers.length; i++) {
-                const container = tabContainers[i];
-                const headers = findHeaders(container);
-                for (let j = 0; j < headers.length; j++) {
-                    const link = headers[j].querySelector("a");
-                    if (link && hasFailureClass(link)) {
-                        hasFailures = true;
-                        break;
-                    }
-                }
-                if (hasFailures) break;
-            }
-            
-            if (hasFailures) {
-                failureFilterCheckBox.onclick = toggleFailureFilter;
-                failureFilterCheckBox.checked = false;
-                removeClass(failureFilterLabel, "hidden");
-            }
+            failureFilterCheckBox.onclick = toggleFailureFilter;
+            failureFilterCheckBox.checked = false;
+            removeClass(failureFilterLabel, "hidden");
         }
 
         initClipboardCopyButton()
