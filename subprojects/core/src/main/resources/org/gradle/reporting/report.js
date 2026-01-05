@@ -143,7 +143,8 @@
         const tables = tab.getElementsByTagName("table");
         for (let i = 0; i < tables.length; i++) {
             const table = tables[i];
-            if (!getClassAttribute(table).includes("test-results")) {
+            const tableClass = getClassAttribute(table);
+            if (!tableClass || !tableClass.includes("test-results")) {
                 continue;
             }
 
