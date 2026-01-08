@@ -63,7 +63,7 @@ class TestProcessingStartupFailureIntegrationTest extends AbstractIntegrationSpe
         failure.assertHasErrorOutput("Error: A fatal exception has occurred. Program will exit.")
 
         and: "Task failure is reported"
-        assertTestWorkerFailedToStart()
+        assertTestWorkerFailedToStart(":test", " (registered by plugin 'org.gradle.jvm-test-suite')")
 
         and: "No test class results are created"
         new DefaultTestExecutionResult(testDirectory).testClassDoesNotExist("MyTest")
@@ -98,7 +98,7 @@ class TestProcessingStartupFailureIntegrationTest extends AbstractIntegrationSpe
 
         then: "Task failure is reported"
 
-        failure.assertHasFailure("Execution failed for task ':test'.") {
+        failure.assertHasFailure("Execution failed for task ':test' (registered by plugin 'org.gradle.jvm-test-suite').") {
             it.assertHasCause("Could not execute test class 'MyOtherTest'.")
         }
         def testResults = new DefaultTestExecutionResult(testDirectory)
@@ -142,7 +142,7 @@ class TestProcessingStartupFailureIntegrationTest extends AbstractIntegrationSpe
 
         then: "Task failure is reported"
 
-        failure.assertHasDescription("Execution failed for task ':test'.")
+        failure.assertHasDescription("Execution failed for task ':test' (registered by plugin 'org.gradle.jvm-test-suite').")
         failure.assertHasCause("Test process encountered an unexpected problem.")
         failure.assertThatCause(matchesRegexp(/Process 'Gradle Test Executor \d+' finished with non-zero exit value.*/))
     }

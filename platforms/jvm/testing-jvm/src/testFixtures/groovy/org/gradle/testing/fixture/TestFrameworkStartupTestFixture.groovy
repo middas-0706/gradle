@@ -31,16 +31,16 @@ import static org.gradle.util.Matchers.matchesRegexp
  */
 @SelfType(AbstractIntegrationSpec)
 trait TestFrameworkStartupTestFixture {
-    void assertTestWorkerFailedToStart(String taskName = ":test") {
-        failure.assertHasDescription("Execution failed for task '$taskName' .")
+    void assertTestWorkerFailedToStart(String taskName = ":test", String taskProvenance = "") {
+        failure.assertHasDescription("Execution failed for task '$taskName'$taskProvenance.")
 
         def taskOutput = result.groupedOutput.task(taskName).output
         assert !(taskOutput =~ /beforeSuite Gradle Test Executor \d+/)
         assert taskOutput =~ /afterSuite Gradle Test Run $taskName \[.*\] FAILURE/
     }
 
-    void assertTestWorkerStartedAndTestFrameworkFailedToStart(String taskName = ":test", int expectedWorkerFailures = 1) {
-        failure.assertHasFailure("Execution failed for task '$taskName' .") {
+    void assertTestWorkerStartedAndTestFrameworkFailedToStart(String taskName = ":test", int expectedWorkerFailures = 1, String taskProvenance = "") {
+        failure.assertHasFailure("Execution failed for task '$taskName'$taskProvenance.") {
             it.assertHasCauses(1 + expectedWorkerFailures)
             it.assertHasCause("Test process encountered an unexpected problem.")
         }

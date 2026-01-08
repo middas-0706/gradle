@@ -73,7 +73,7 @@ class TestFrameworkMissingDependenciesIntegrationTest extends AbstractIntegratio
         fails('test')
 
         then: "Test framework startup failure is reported"
-        assertTestWorkerStartedAndTestFrameworkFailedToStart(":test", 2)
+        assertTestWorkerStartedAndTestFrameworkFailedToStart(":test", 2, " (registered by plugin 'org.gradle.jvm-test-suite')")
 
         and: "Resolutions are provided"
         assertSuggestsInspectTaskConfiguration()
@@ -111,7 +111,7 @@ class TestFrameworkMissingDependenciesIntegrationTest extends AbstractIntegratio
         fails('test')
 
         then: "Test framework startup failure is reported"
-        assertTestWorkerStartedAndTestFrameworkFailedToStart()
+        assertTestWorkerStartedAndTestFrameworkFailedToStart(":test", 1, " (registered by plugin 'org.gradle.jvm-test-suite')")
 
         and: "Resolutions are provided"
         assertSuggestsInspectTaskConfiguration()
@@ -151,7 +151,7 @@ class TestFrameworkMissingDependenciesIntegrationTest extends AbstractIntegratio
         fails('test')
 
         then: "Test framework startup failure is reported"
-        assertTestWorkerStartedAndTestFrameworkFailedToStart()
+        assertTestWorkerStartedAndTestFrameworkFailedToStart(":test", 1, " (registered by plugin 'org.gradle.jvm-test-suite')")
 
         and: "Resolutions are provided"
         assertSuggestsInspectTaskConfiguration()
@@ -189,7 +189,7 @@ class TestFrameworkMissingDependenciesIntegrationTest extends AbstractIntegratio
         fails('test')
 
         then: "Test framework startup failure is reported"
-        assertTestWorkerStartedAndTestFrameworkFailedToStart()
+        assertTestWorkerStartedAndTestFrameworkFailedToStart(":test", 1, " (registered by plugin 'org.gradle.jvm-test-suite')")
 
         and: "Resolutions are provided"
         assertSuggestsInspectTaskConfiguration()
