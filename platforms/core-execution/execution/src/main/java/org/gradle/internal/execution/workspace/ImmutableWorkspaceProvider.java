@@ -20,8 +20,7 @@ import java.io.File;
 import java.util.function.Supplier;
 
 public interface ImmutableWorkspaceProvider {
-    AtomicMoveImmutableWorkspace getAtomicMoveWorkspace(String path);
-    LockingImmutableWorkspace getLockingWorkspace(String path);
+    ImmutableWorkspace getWorkspace(String path);
 
     interface ImmutableWorkspace {
         /**
@@ -31,6 +30,26 @@ public interface ImmutableWorkspaceProvider {
          *     and for {@link AtomicMoveImmutableWorkspace} this will normally be $GRADLE_USER_HOME/caches/transforms/[gradle-version]/[hash]/
          */
         File getImmutableLocation();
+
+        /**
+         * Executes the given action with process file lock.
+         */
+        <T> T withProcessLock(Supplier<T> action);
+
+        /**
+         * Executes the given action with thread lock.
+         */
+        <T> T withThreadLock(Supplier<T> action);
+
+        /**
+         * Returns true if the workspace has been soft deleted.
+         */
+        boolean isSoftDeleted();
+
+        /**
+         * Remove soft deletion marker, which means entry won't be deleted anymore.
+         */
+        void ensureUnSoftDeleted();
     }
 
     /**
