@@ -38,6 +38,7 @@ import org.gradle.internal.snapshot.FileSystemSnapshot;
 import org.gradle.internal.snapshot.FileSystemSnapshotHierarchyVisitor;
 import org.gradle.internal.snapshot.SnapshotVisitResult;
 import org.gradle.internal.vfs.FileSystemAccess;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +48,10 @@ import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
 import static com.google.common.collect.Maps.immutableEntry;
 import static org.gradle.internal.execution.Execution.ExecutionOutcome.UP_TO_DATE;
@@ -81,12 +84,8 @@ import static org.gradle.internal.snapshot.SnapshotVisitResult.CONTINUE;
  * </ul>
  */
 public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements Step<C, WorkspaceResult> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AssignImmutableWorkspaceStep.class);
 
-    enum LockingStrategy {
-        WORKSPACE_LOCK,
-        ATOMIC_MOVE
-    }
+    private static final Logger LOGGER = LoggerFactory.getLogger(AssignImmutableWorkspaceStep.class);
 
     private final Deleter deleter;
     private final FileSystemAccess fileSystemAccess;
@@ -116,16 +115,18 @@ public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements 
         ImmutableWorkspace workspace = workspaceProvider.getWorkspace(uniqueId);
         // We are reading/invalidating snapshots, only one thread should do that at a time.
         return workspace.withThreadLock(() -> loadImmutableWorkspaceIfExists(work, workspace)
-            .orElseGet(() -> workspace.withProcessLock(() -> {
+            .orElseGet(initialLoadStatus -> workspace.withProcessLock(() -> {
                     // We need to invalidate snapshots in case another process populated the workspace already
                     Runnable invalidateSnapshots = () -> fileSystemAccess.invalidate(ImmutableList.of(workspace.getImmutableLocation().getAbsolutePath()));
                     WorkspaceResult result = loadImmutableWorkspaceIfComplete(work, workspace, invalidateSnapshots)
-                        .orElseGet(() -> {
+                        .orElseGet(__ -> {
                             ensureEmptyDirectory(workspace);
                             fileSystemAccess.invalidate(ImmutableList.of(workspace.getImmutableLocation().getAbsolutePath()));
                             return executeInWorkspace(work, context, workspace.getImmutableLocation());
                         });
-                    workspace.ensureUnSoftDeleted();
+                    if (initialLoadStatus == LoadWorkspaceResult.Status.SOFT_DELETED) {
+                        workspace.ensureUnSoftDeleted();
+                    }
                     return result;
                 }
             )));
@@ -139,14 +140,14 @@ public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements 
         }
     }
 
-    private Optional<WorkspaceResult> loadImmutableWorkspaceIfExists(UnitOfWork work, ImmutableWorkspace workspace) {
+    private LoadWorkspaceResult loadImmutableWorkspaceIfExists(UnitOfWork work, ImmutableWorkspace workspace) {
         File immutableLocation = workspace.getImmutableLocation();
         FileSystemLocationSnapshot snapshot = fileSystemAccess.read(immutableLocation.getAbsolutePath());
         switch (snapshot.getType()) {
             case Directory:
                 if (workspace.isSoftDeleted()) {
                     // If the workspace is soft deleted, we need to load it under the process lock, since hard delete operation could run.
-                    return Optional.empty();
+                    return LoadWorkspaceResult.softDeleted();
                 }
                 // Don't invalidate snapshots here, we have just read them
                 return loadImmutableWorkspaceIfComplete(work, workspace, () -> {});
@@ -155,18 +156,18 @@ public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements 
                     "Immutable workspace is occupied by a file: " + immutableLocation.getAbsolutePath() + ". " +
                         "Deleting the file in question can allow the content to be recreated.");
             case Missing:
-                return Optional.empty();
+                return LoadWorkspaceResult.missingOrBroken();
             default:
                 throw new AssertionError();
         }
     }
 
-    private Optional<WorkspaceResult> loadImmutableWorkspaceIfComplete(UnitOfWork work, ImmutableWorkspace workspace, Runnable snapshotsInvalidation) {
+    private LoadWorkspaceResult loadImmutableWorkspaceIfComplete(UnitOfWork work, ImmutableWorkspace workspace, Runnable snapshotsInvalidation) {
         File immutableLocation = workspace.getImmutableLocation();
         Optional<ImmutableWorkspaceMetadata> metadata = workspaceMetadataStore.loadWorkspaceMetadata(immutableLocation);
 
         if (!metadata.isPresent()) {
-            return Optional.empty();
+            return LoadWorkspaceResult.missingOrBroken();
         }
 
         // Verify output hashes
@@ -184,10 +185,10 @@ public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements 
                 "The modification might have been caused by an external process, or could be the result of disk corruption.\n" +
                 "{}", immutableLocation.getAbsolutePath(), actualOutputHashes);
             // Inconsistent workspace, we need to re-execute the work
-            return Optional.empty();
+            return LoadWorkspaceResult.missingOrBroken();
         }
 
-        return Optional.of(loadImmutableWorkspace(work, immutableLocation, metadata.get(), outputSnapshots));
+        return LoadWorkspaceResult.success(loadImmutableWorkspace(work, immutableLocation, metadata.get(), outputSnapshots));
     }
 
     private static WorkspaceResult loadImmutableWorkspace(UnitOfWork work, File immutableLocation, ImmutableWorkspaceMetadata metadata, ImmutableSortedMap<String, FileSystemSnapshot> outputSnapshots) {
@@ -269,5 +270,38 @@ public class AssignImmutableWorkspaceStep<C extends IdentityContext> implements 
             }
         });
         return builder.toString();
+    }
+
+    private static class LoadWorkspaceResult {
+        enum Status {
+            SUCCESS,
+            SOFT_DELETED,
+            MISSING_OR_BROKEN
+        }
+
+        @Nullable
+        private final WorkspaceResult workspaceResult;
+        private final Status status;
+
+        private LoadWorkspaceResult(@Nullable WorkspaceResult workspaceResult, Status status) {
+            this.workspaceResult = workspaceResult;
+            this.status = status;
+        }
+
+        public WorkspaceResult orElseGet(Function<Status, WorkspaceResult> fallback) {
+            return status == Status.SUCCESS ? checkNotNull(workspaceResult) : fallback.apply(status);
+        }
+
+        public static LoadWorkspaceResult success(WorkspaceResult workspaceResult) {
+            return new LoadWorkspaceResult(workspaceResult, Status.SUCCESS);
+        }
+
+        public static LoadWorkspaceResult softDeleted() {
+            return new LoadWorkspaceResult(null, Status.SOFT_DELETED);
+        }
+
+        public static LoadWorkspaceResult missingOrBroken() {
+            return new LoadWorkspaceResult(null, Status.MISSING_OR_BROKEN);
+        }
     }
 }
